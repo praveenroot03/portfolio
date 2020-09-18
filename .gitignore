@@ -115,5 +115,5 @@ media/
 # !**/migrations
 # !**/migrations/__init__.py
 .vscode/
-about_image/*
-background_img/*
+**/about_image/**
+**/background_img/**
