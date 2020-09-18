@@ -1,0 +1,2 @@
+mainPage/views.py 53 61 image url is returned prefixing / leads to 404 error always (Resolved by using image.path to use absolute path)
+add functionaly to compress uploaded image(Done, need to test it)

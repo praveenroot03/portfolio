@@ -1,0 +1,5 @@
+django
+django-admin-ip-restrictor
+ip2geotools
+django-cleanup
+pillow
