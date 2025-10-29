@@ -1,67 +1,84 @@
+"""Views for the portfolio application."""
+
+from __future__ import annotations
+
+from typing import Dict, Iterable, List
+
+from django.http import FileResponse, Http404
 from django.shortcuts import render
-from django.http import HttpResponse
-from mainPage.log import logger
-from mainPage.utils import utlity
-from mainPage.models import Background_img, About, Portfolio, Blog, Contact
-import base64
-from django.http import Http404
 from django.views.decorators.cache import never_cache
+
+from mainPage.log import VisitorLogger
+from mainPage.models import About, Background_img, Blog, Contact, Portfolio
+from mainPage.utils import ClientMeta, Utility
+
+
+utility = Utility()
+visitor_logger = VisitorLogger()
+
+
+def _build_about_sections(about: About | None) -> List[str]:
+    if not about or not about.content:
+        return []
+    return [segment.strip() for segment in about.content.splitlines() if segment.strip()]
+
+
+def _get_contacts() -> Iterable[Contact]:
+    return Contact.objects.order_by("types")
 
 
 @never_cache
 def index(request):
-    u = utlity()
-    client_ip_addr = u.get_client_ip_address(request)
-    client_user_agent = u.get_user_agent(request)
-    logger.add(logger, client_ip_addr, client_user_agent)
-    try:
-        portfolio = Portfolio.objects.first()
-        specialisation = portfolio.specialisation_set.all()
-        about_unformated = About.objects.first().content
-        about = about_unformated.split('\n')
-        blogs = Blog.objects.all()
-        contacts = Contact.objects.all()
-        data = {'portfolio' : portfolio, 'about': about, 'specialisations' : specialisation, "blogs" : blogs, 'contacts': contacts }
-    except:
+    client = ClientMeta(
+        ip_address=utility.get_client_ip_address(request),
+        user_agent=utility.get_user_agent(request),
+    )
 
-        data = {'response': "Internal Server Error"}
-    
+    portfolio = Portfolio.objects.first()
+    specialisations = portfolio.specialisation_set.all() if portfolio else []
+    about = About.objects.first()
+    blogs = Blog.objects.order_by("-pub_date")
+    contacts = _get_contacts()
+
+    context: Dict[str, object] = {
+        "portfolio": portfolio,
+        "about": _build_about_sections(about),
+        "specialisations": specialisations,
+        "blogs": blogs,
+        "contacts": contacts,
+    }
 
     if request.method == "POST":
-        name = request.POST['name']
-        email = request.POST['email']
-        message = request.POST['message']
+        name = request.POST.get("name", "").strip()
+        email = request.POST.get("email", "").strip()
+        message = request.POST.get("message", "").strip()
 
         feedback = {"name": name, "email": email, "message": message}
-        logger.add(logger, client_ip_addr, client_user_agent, feedback=feedback)
+        visitor_logger.add(client.ip_address, client.user_agent, feedback=feedback)
 
-        response = "Thanks I will consider you response"
-        data = {'portfolio' : portfolio, 'about': about, 'specialisations' : specialisation, "blogs" : blogs, 'contacts': contacts , 'response': response}
+        context["response"] = "Thanks! I'll be in touch shortly."
+    else:
+        visitor_logger.add(client.ip_address, client.user_agent)
 
-    return render(request, 'mainPage/index.html', data)
+    return render(request, "mainPage/index.html", context)
 
 
-#here comes shitty bug, need to resolve image path
 @never_cache
-def serve_image(request, types):
-    image_data = None
-    if types and (types == "bg" or types == "ab"):
-        if types == "bg":
+def serve_image(request, types: str):
+    image_field = None
 
-            try:
-                random_background = Background_img.random(Background_img.objects.all())
-                image_data = open(random_background.image.path, "rb").read()
-            except:
-                raise Http404
-                
-        elif types == "ab":
-            
-            try:
-                about_image = About.objects.all().first()
-                image_data = open(about_image.image.path, "rb").read()
-            except:
-                raise Http404
-    if not image_data:
+    if types == "bg":
+        background = Background_img.random()
+        if background:
+            image_field = background.image
+    elif types == "ab":
+        about = About.objects.first()
+        if about:
+            image_field = about.image
+
+    if not image_field:
         raise Http404
 
-    return HttpResponse(image_data, content_type="image/jpeg")
+    image_file = image_field.open("rb")
+    return FileResponse(image_file, content_type="image/jpeg")
+
