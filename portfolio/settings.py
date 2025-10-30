@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts.apps.AccountsConfig',
     'mainPage.apps.MainpageConfig',
     'django_cleanup.apps.CleanupConfig',
     'admin_honeypot.apps.Admin_honeypotConfig',
@@ -131,4 +132,5 @@ STATIC_ROOT = os.path.join(PROJECT_DIR, 'static')
 # Session expiration set for 5 minutes
 SESSION_COOKIE_AGE = 5 * 60
 
+MFA_ISSUER_NAME = "Portfolio"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
