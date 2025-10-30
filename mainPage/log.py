@@ -1,44 +1,74 @@
-from mainPage.models import People, Visit_detail
+"""Visitor logging helpers."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Mapping, MutableMapping, Optional
+
 from django.db.models import F
 from django.utils import timezone
-import datetime
+
+from mainPage.models import People, Visit_detail
 
 
-class logger:
+ANONYMOUS_EMAIL = "anonymous@example.com"
+ANONYMOUS_NAME = "Visitor"
 
-    def __init__(self):
-        self.people = People
 
-    def add(self, ip_addr, user_agent, feedback=None):
-        try:
-            people = People.objects.get(ip_address=ip_addr)
-        except People.DoesNotExist:
-            people = None
-        
-        if people:
-            
-            if timezone.now() - datetime.timedelta(minutes=5) >= people.last_visited:
-                people.no_of_visits = F('no_of_visits') + 1
-                people.save()
-                if feedback:
-                    name = feedback.get("name")
-                    email = feedback.get("email")
-                    msg = feedback.get("msg")
-                    details = Visit_detail(people= people, user_agent=user_agent, name=name, email_id=email, message=msg)
-                    details.save()
-                else:
-                    details = Visit_detail(people= people, user_agent=user_agent,)
-                    details.save()
+@dataclass
+class Feedback:
+    """Normalized structure for feedback submitted through the site."""
 
-            elif feedback:
-                name = feedback.get("name")
-                email = feedback.get("email")
-                msg = feedback.get("message")
-                details = Visit_detail(people= people, user_agent=user_agent, name=name, email_id=email, message=msg)
-                details.save()
+    name: str
+    email: str
+    message: str
 
-        else:
-            new_people = People(ip_address=ip_addr)
-            new_people.save()
-            visit_detail = Visit_detail(people= new_people,user_agent=user_agent)
-            visit_detail.save()
+    @classmethod
+    def from_mapping(cls, payload: Optional[Mapping[str, str]]) -> "Feedback":
+        payload = payload or {}
+        return cls(
+            name=payload.get("name", ANONYMOUS_NAME).strip() or ANONYMOUS_NAME,
+            email=payload.get("email", ANONYMOUS_EMAIL).strip() or ANONYMOUS_EMAIL,
+            message=payload.get("message", "").strip(),
+        )
+
+
+class VisitorLogger:
+    """Persist visitor metadata to the database."""
+
+    cooldown = timedelta(minutes=5)
+
+    def add(self, ip_addr: str, user_agent: str, feedback: Optional[Mapping[str, str]] = None) -> None:
+        if not ip_addr:
+            return
+
+        feedback_payload = Feedback.from_mapping(feedback)
+        person, created = People.objects.get_or_create(
+            ip_address=ip_addr,
+            defaults={"last_visited": timezone.now()},
+        )
+
+        should_increment_visits = (not created) and (
+            timezone.now() - person.last_visited >= self.cooldown
+        )
+        update_kwargs: MutableMapping[str, object] = {"last_visited": timezone.now()}
+
+        if should_increment_visits:
+            update_kwargs["no_of_visits"] = F("no_of_visits") + 1
+
+        People.objects.filter(pk=person.pk).update(**update_kwargs)
+        person.refresh_from_db()
+
+        Visit_detail.objects.create(
+            people=person,
+            user_agent=user_agent,
+            name=feedback_payload.name,
+            email_id=feedback_payload.email,
+            message=feedback_payload.message,
+        )
+
+
+# Backwards compatibility with the historic class name.
+logger = VisitorLogger
+

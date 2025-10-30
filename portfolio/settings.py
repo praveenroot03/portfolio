@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts.apps.AccountsConfig',
     'mainPage.apps.MainpageConfig',
     'django_cleanup.apps.CleanupConfig',
     'admin_honeypot.apps.Admin_honeypotConfig',
@@ -111,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Calcutta'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
@@ -128,5 +129,9 @@ STATIC_URL = '/static/'
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_ROOT = os.path.join(PROJECT_DIR, 'static')
 
-# Session expiration set for 5 Min
+# Session expiration set for 5 minutes
 SESSION_COOKIE_AGE = 5 * 60
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+MFA_ISSUER_NAME = "Portfolio"
