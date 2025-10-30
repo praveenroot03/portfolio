@@ -1,38 +1,25 @@
-from django.db import models
-from django.utils import timezone
+from __future__ import annotations
+
 import datetime
 from io import BytesIO
-from PIL import Image, ExifTags
-from django.core.files import File
+from typing import Optional
+
 from django.core.exceptions import ValidationError
-from mainPage.utils import utlity
-from django.db.models.aggregates import Count
-from random import randint
+from django.core.files import File
+from django.db import models
+from django.utils import timezone
+from PIL import Image, ImageOps
+
+from mainPage.utils import Utility
 
 
 def compress(image):
-    im = Image.open(image)
-    print(im.format)
-    try:
-        if im.format != 'PNG':
-            for orientation in ExifTags.TAGS.keys():
-                if ExifTags.TAGS[orientation]=='Orientation' : break 
-            exif=dict(im._getexif().items())
-
-            if exif[orientation] == 3:
-                im=im.rotate(180, expand=True)
-            elif exif[orientation] == 6:
-                im=im.rotate(270, expand=True)
-            elif exif[orientation] == 8 :
-                im=im.rotate(90, expand=True)
-    except:
-        pass
-    
-    im = im.convert('RGB')
-    im_io = BytesIO()     
-    im.save(im_io,format='JPEG', quality=60)
-    new_image = File(im_io, name=image.name)
-    return new_image
+    with Image.open(image) as source:
+        processed = ImageOps.exif_transpose(source).convert("RGB")
+        buffer = BytesIO()
+        processed.save(buffer, format="JPEG", optimize=True, quality=70)
+    buffer.seek(0)
+    return File(buffer, name=image.name)
 
 
 class Portfolio(models.Model):
@@ -52,13 +39,12 @@ class Portfolio(models.Model):
 
 
 class Background_img(models.Model):
-    portfolio = models.ForeignKey(Portfolio, on_delete=models.CASCADE )
-    image = models.ImageField(upload_to='mainPage/background_img')
+    portfolio = models.ForeignKey(Portfolio, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to="mainPage/background_img")
 
-    def random(self):
-        count = self.aggregate(count=Count('id'))['count']
-        random_index = randint(0, count - 1)
-        return self.all()[random_index]
+    @classmethod
+    def random(cls) -> Optional["Background_img"]:
+        return cls.objects.order_by("?").first()
 
     def save(self, *args, **kwargs):
         new_image = compress(self.image)
@@ -70,14 +56,14 @@ class Background_img(models.Model):
 
 
 class Specialisation(models.Model):
-    portfolio = models.ForeignKey(Portfolio, on_delete=models.CASCADE )
+    portfolio = models.ForeignKey(Portfolio, on_delete=models.CASCADE)
     specialisation_name = models.CharField(max_length=50)
 
     def __str__(self):
         return self.specialisation_name
 
     def save(self, *args, **kwargs):
-        if self.__class__.objects.count() == 4:
+        if self.pk is None and self.__class__.objects.count() >= 3:
             raise ValidationError("Only three specialisation allowed")
         super().save(*args, **kwargs)
 
@@ -170,7 +156,7 @@ class Visit_detail(models.Model):
     country = models.CharField(max_length=5, null=True)
 
     def save(self, *args, **kwargs):
-        location = utlity.get_location_via_ip(utlity ,self.people.ip_address)
+        location = Utility.get_location_via_ip(self.people.ip_address)
         if location:
             self.city = location.get("city")
             self.region = location.get("region")

@@ -1,5 +1,5 @@
-django
-django-admin-ip-restrictor
-ip2geotools
-django-cleanup
-pillow
+django>=4.2,<5.0
+django-admin-ip-restrictor>=1.4
+ip2geotools>=0.1.6
+django-cleanup>=8.0
+pillow>=9.5
