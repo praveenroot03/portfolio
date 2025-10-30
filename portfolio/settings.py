@@ -132,6 +132,5 @@ STATIC_ROOT = os.path.join(PROJECT_DIR, 'static')
 # Session expiration set for 5 minutes
 SESSION_COOKIE_AGE = 5 * 60
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
 MFA_ISSUER_NAME = "Portfolio"
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
